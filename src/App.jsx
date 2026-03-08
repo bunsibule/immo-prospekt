@@ -6,7 +6,7 @@ const TYPES = ["Tous types","Maison","Appartement","Terrain","Local commercial"]
 const STATUSES = ["À appeler","Appelé","En discussion","Mandat signé","Sans suite"];
 const STATUS_C = { "À appeler":"#f59e0b","Appelé":"#3b82f6","En discussion":"#8b5cf6","Mandat signé":"#10b981","Sans suite":"#6b7280" };
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-1.5-flash";
 
 function Badge({ status }) {
   const c = STATUS_C[status] || "#6b7280";
