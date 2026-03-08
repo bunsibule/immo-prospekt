@@ -105,7 +105,7 @@ if (!rawText.trim()) {
 // DEBUG TEMPORAIRE
 setSearchErr("DEBUG rawText: " + rawText.slice(0, 500));
 setSearching(false); return;
-      }
+
 
       // Étape 2 : structurer en JSON
       setSearchStep("⚙️ Analyse et structuration des résultats…");
