@@ -111,12 +111,13 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
         else setSearchErr(`Erreur API : ${err?.error?.message || res.status}`);
         setSearching(false); return;
       }
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      const clean = text.replace(/```json|```/g,"").trim();
-      const match = clean.match(/\[[\s\S]*\]/);
-      if (!match) { setSearchErr("Pas de résultats structurés. Réessaie."); setSearching(false); return; }
-      const parsed = JSON.parse(match[0]);
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const text = parts.map(p => p.text || "").join("");
+    const clean = text.replace(/```json|```/g,"").trim();
+    const match = clean.match(/\[[\s\S]*\]/);
+    if (!match) { setSearchErr("Pas de résultats structurés. Réessaie."); setSearching(false); return; }
+    const parsed = JSON.parse(match[0]);
       setResults(Array.isArray(parsed) ? parsed : []);
       if (!parsed.length) setSearchErr("Aucune annonce trouvée. Essaie d'élargir les critères.");
     } catch(e) {
