@@ -98,9 +98,13 @@ export default function App() {
       const data1 = await res1.json();
       const rawText = (data1.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
 
-      if (!rawText.trim()) {
-        setSearchErr("Aucun résultat trouvé. Essaie d'élargir les critères.");
-        setSearching(false); return;
+if (!rawText.trim()) {
+  setSearchErr("Aucun résultat trouvé. Essaie d'élargir les critères.");
+  setSearching(false); return;
+}
+// DEBUG TEMPORAIRE
+setSearchErr("DEBUG rawText: " + rawText.slice(0, 500));
+setSearching(false); return;
       }
 
       // Étape 2 : structurer en JSON
