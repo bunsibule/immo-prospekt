@@ -25,6 +25,7 @@ export default function App() {
   const [source, setSource] = useState("Toutes sources");
   const [anciennete, setAnciennete] = useState("30");
   const [searching, setSearching] = useState(false);
+  const [searchStep, setSearchStep] = useState("");
   const [results, setResults] = useState([]);
   const [searchErr, setSearchErr] = useState("");
   const [lastSearch, setLastSearch] = useState(null);
@@ -39,7 +40,7 @@ export default function App() {
 
   useEffect(() => { loadShortlist(); }, []);
   useEffect(() => {
-    const ch = supabase.channel("hunter3").on("postgres_changes",{event:"*",schema:"public",table:"prospects"},loadShortlist).subscribe();
+    const ch = supabase.channel("hunter4").on("postgres_changes",{event:"*",schema:"public",table:"prospects"},loadShortlist).subscribe();
     return () => supabase.removeChannel(ch);
   }, []);
 
@@ -72,58 +73,66 @@ export default function App() {
       : source === "Facebook" ? "Facebook Marketplace et groupes Facebook locaux de l'Aude uniquement"
       : "journaux d'annonces légales de l'Aude uniquement";
 
-    const prompt = `Tu es un assistant de prospection immobilière. Cherche sur internet des annonces immobilières récentes (moins de ${anciennete} jours) publiées par des PARTICULIERS (sans agence) dans ces zones : ${zonesStr}, département Aude (11), France.
-Type de bien recherché : ${typeStr}.
-Source à fouiller : ${sourceStr}.
-Privilégie les annonces avec signaux de motivation vendeur : baisses de prix, succession, divorce, mutation professionnelle, propriétaire bailleur lassé.
-
-Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
-[{
-  "titre": "description courte du bien (ex: Maison 4p jardin Narbonne)",
-  "type": "Maison|Appartement|Terrain|Local commercial",
-  "zone": "ville ou secteur précis",
-  "prix": "prix affiché avec €, ou vide",
-  "source": "Le Bon Coin|PAP.fr|Facebook|Annonces légales",
-  "url": "lien direct vers l'annonce si trouvé, sinon vide",
-  "contact": "nom ou pseudo vendeur si visible, sinon vide",
-  "anciennete": "nombre de jours depuis publication estimé, ou vide",
-  "signal": "signal de motivation vendeur détecté",
-  "note": "1 phrase : pourquoi c'est une bonne piste à appeler"
-}]
-6 à 10 résultats maximum. Si rien trouvé : [].`;
-
     try {
-      const res = await fetch(
+      // Étape 1 : recherche avec Google Search
+      setSearchStep("🔍 Recherche en cours sur " + (source === "Toutes sources" ? "LBC, PAP, Facebook, annonces légales" : source) + "…");
+      const res1 = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
         {
           method:"POST", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({
             tools:[{ google_search:{} }],
-            contents:[{ role:"user", parts:[{ text:prompt }] }],
-            generationConfig:{ temperature:0.2, maxOutputTokens:2048 }
+            contents:[{ role:"user", parts:[{ text:`Cherche sur internet des annonces immobilières récentes (moins de ${anciennete} jours) publiées par des PARTICULIERS sans agence dans ces zones : ${zonesStr}, département Aude (11), France. Type de bien : ${typeStr}. Sources à fouiller : ${sourceStr}. Pour chaque annonce trouvée, donne le maximum de détails : titre du bien, ville, prix, lien vers l'annonce, contact si visible, date de publication, et tout signal de motivation vendeur (baisse de prix, succession, divorce, mutation, urgence).` }] }],
+            generationConfig:{ temperature:0.1, maxOutputTokens:2048 }
           })
         }
       );
-      if (!res.ok) {
-        const err = await res.json();
-        if (res.status===400) setSearchErr("Clé API invalide.");
-        else if (res.status===429) setSearchErr("Trop de requêtes — attends 60 secondes et réessaie.");
-        else setSearchErr(`Erreur API : ${err?.error?.message || res.status}`);
+
+      if (!res1.ok) {
+        const err = await res1.json();
+        if (res1.status===429) setSearchErr("Trop de requêtes — attends 60 secondes et réessaie.");
+        else setSearchErr(`Erreur API : ${err?.error?.message || res1.status}`);
         setSearching(false); return;
       }
-    const data = await res.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const text = parts.map(p => p.text || "").join("");
-    const clean = text.replace(/```json|```/g,"").trim();
-    const match = clean.match(/\[[\s\S]*\]/);
-    if (!match) { setSearchErr("Pas de résultats structurés. Réessaie."); setSearching(false); return; }
-    const parsed = JSON.parse(match[0]);
+
+      const data1 = await res1.json();
+      const rawText = (data1.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
+
+      if (!rawText.trim()) {
+        setSearchErr("Aucun résultat trouvé. Essaie d'élargir les critères.");
+        setSearching(false); return;
+      }
+
+      // Étape 2 : structurer en JSON
+      setSearchStep("⚙️ Analyse et structuration des résultats…");
+      const res2 = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+        {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({
+            contents:[{ role:"user", parts:[{ text:`Voici des résultats de recherche sur des annonces immobilières :\n\n${rawText}\n\nExtrait et structure ces annonces en tableau JSON. Retourne UNIQUEMENT le tableau JSON brut, sans markdown, sans backticks, sans texte avant ou après :\n[{"titre":"description courte du bien ex Maison 4p avec jardin","type":"Maison ou Appartement ou Terrain ou Local commercial","zone":"ville ou secteur","prix":"prix avec euro ou vide si inconnu","source":"Le Bon Coin ou PAP.fr ou Facebook ou Annonces légales","url":"lien direct vers annonce ou vide","contact":"nom ou pseudo vendeur ou vide","anciennete":"nombre de jours estimé ou vide","signal":"signal motivation vendeur ex baisse de prix succession divorce ou vide","note":"1 phrase pourquoi bonne piste pour Amandine mandataire immobilière"}]\nMaximum 10 résultats. Si aucune annonce exploitable retourner [].` }] }],
+            generationConfig:{ temperature:0, maxOutputTokens:2048 }
+          })
+        }
+      );
+
+      const data2 = await res2.json();
+      const text2 = (data2.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
+      const clean = text2.replace(/```json|```/g,"").trim();
+      const match = clean.match(/\[[\s\S]*\]/);
+      if (!match) {
+        setSearchErr("Pas de résultats exploitables. Réessaie dans quelques secondes.");
+        setSearching(false); return;
+      }
+      const parsed = JSON.parse(match[0]);
       setResults(Array.isArray(parsed) ? parsed : []);
-      if (!parsed.length) setSearchErr("Aucune annonce trouvée. Essaie d'élargir les critères.");
+      if (!parsed.length) setSearchErr("Aucune annonce trouvée. Essaie d'élargir les critères ou l'ancienneté.");
+
     } catch(e) {
       setSearchErr("Erreur de connexion. Réessaie.");
     }
     setSearching(false);
+    setSearchStep("");
   }
 
   async function sauvegarder(r) {
@@ -159,7 +168,7 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
         { method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({ contents:[{ role:"user", parts:[{ text:`Rédige un message de prospection court et chaleureux pour , mandataire immobilière dans l'Aude. Prospect : ${p.name}, bien : ${p.type}, zone : ${p.zone}. Contexte : ${p.note||"aucun"}. Français, moins de 80 mots, humain, pas commercial. Proposer un simple appel. Signer "Amandine – Mandataire immobilière, Narbonne & Corbières". Message uniquement.` }] }], generationConfig:{maxOutputTokens:300} }) }
+          body:JSON.stringify({ contents:[{ role:"user", parts:[{ text:`Rédige un message de prospection court et chaleureux pour Amandine, mandataire immobilière dans l'Aude. Prospect : ${p.name}, bien : ${p.type}, zone : ${p.zone}. Contexte : ${p.note||"aucun"}. Français, moins de 80 mots, humain, pas commercial. Proposer un simple appel. Signer "Amandine – Mandataire immobilière, Narbonne & Corbières". Message uniquement.` }] }], generationConfig:{maxOutputTokens:300} }) }
       );
       const d = await res.json();
       setGenMsg(d.candidates?.[0]?.content?.parts?.[0]?.text || "Erreur.");
@@ -263,7 +272,6 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
             )}
 
             <div style={{ background:"rgba(201,168,76,.05)",border:"1px solid rgba(201,168,76,.2)",borderRadius:18,padding:28,marginBottom:28 }}>
-              {/* Zones */}
               <div style={{ marginBottom:20 }}>
                 <label style={{ fontSize:11,color:"#6b7280",display:"block",marginBottom:10,textTransform:"uppercase",letterSpacing:"1px",fontWeight:600 }}>📍 Zones</label>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>
@@ -273,7 +281,6 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
                 </div>
               </div>
 
-              {/* Filtres en 3 colonnes */}
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:22 }}>
                 <div>
                   <label style={{ fontSize:11,color:"#6b7280",display:"block",marginBottom:7,textTransform:"uppercase",letterSpacing:"1px",fontWeight:600 }}>🏠 Type de bien</label>
@@ -306,9 +313,9 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
             {searching && (
               <div style={{ textAlign:"center",padding:"50px 0" }}>
                 <div style={{ display:"flex",justifyContent:"center",marginBottom:16 }}><Spinner size={40}/></div>
-                <div style={{ fontSize:16,color:"#c9a84c",fontWeight:600,marginBottom:8 }}>Gemini cherche pour toi…</div>
+                <div style={{ fontSize:16,color:"#c9a84c",fontWeight:600,marginBottom:8 }}>{searchStep || "Gemini cherche pour toi…"}</div>
                 <div style={{ fontSize:13,color:"#4b5563" }}>Fouille {source === "Toutes sources" ? "LBC, PAP, Facebook, annonces légales" : source}</div>
-                <div style={{ fontSize:12,color:"#374151",marginTop:6 }}>20 à 40 secondes</div>
+                <div style={{ fontSize:12,color:"#374151",marginTop:6 }}>30 à 60 secondes</div>
               </div>
             )}
 
