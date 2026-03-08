@@ -158,7 +158,7 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
         { method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({ contents:[{ role:"user", parts:[{ text:`Rédige un message de prospection court et chaleureux pour Sophie, mandataire immobilière dans l'Aude. Prospect : ${p.name}, bien : ${p.type}, zone : ${p.zone}. Contexte : ${p.note||"aucun"}. Français, moins de 80 mots, humain, pas commercial. Proposer un simple appel. Signer "Sophie – Mandataire immobilière, Narbonne & Corbières". Message uniquement.` }] }], generationConfig:{maxOutputTokens:300} }) }
+          body:JSON.stringify({ contents:[{ role:"user", parts:[{ text:`Rédige un message de prospection court et chaleureux pour , mandataire immobilière dans l'Aude. Prospect : ${p.name}, bien : ${p.type}, zone : ${p.zone}. Contexte : ${p.note||"aucun"}. Français, moins de 80 mots, humain, pas commercial. Proposer un simple appel. Signer "Amandine – Mandataire immobilière, Narbonne & Corbières". Message uniquement.` }] }], generationConfig:{maxOutputTokens:300} }) }
       );
       const d = await res.json();
       setGenMsg(d.candidates?.[0]?.content?.parts?.[0]?.text || "Erreur.");
@@ -206,7 +206,7 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
             <span style={{ width:7,height:7,borderRadius:"50%",background:apiKey?"#10b981":"#ef4444",display:"inline-block" }}/>
             <span style={{ fontSize:11,color:"#374151" }}>{apiKey?"Gemini connecté":"Clé manquante"}</span>
           </div>
-          <div style={{ fontSize:12,color:"#c9a84c",fontWeight:600,paddingLeft:8,marginTop:4 }}>Sophie ✦</div>
+          <div style={{ fontSize:12,color:"#c9a84c",fontWeight:600,paddingLeft:8,marginTop:4 }}>Amandine ✦</div>
         </div>
       </div>
 
