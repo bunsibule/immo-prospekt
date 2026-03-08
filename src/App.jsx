@@ -74,58 +74,35 @@ export default function App() {
       : "journaux d'annonces légales de l'Aude uniquement";
 
     try {
-      // Étape 1 : recherche avec Google Search
-      setSearchStep("🔍 Recherche en cours sur " + (source === "Toutes sources" ? "LBC, PAP, Facebook, annonces légales" : source) + "…");
-      const res1 = await fetch(
+      setSearchStep("🔍 Gemini fouille le web…");
+      const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
         {
           method:"POST", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({
             tools:[{ google_search:{} }],
-            contents:[{ role:"user", parts:[{ text:`Cherche sur internet des annonces immobilières récentes (moins de ${anciennete} jours) publiées par des PARTICULIERS sans agence dans ces zones : ${zonesStr}, département Aude (11), France. Type de bien : ${typeStr}. Sources à fouiller : ${sourceStr}. Pour chaque annonce trouvée, donne le maximum de détails : titre du bien, ville, prix, lien vers l'annonce, contact si visible, date de publication, et tout signal de motivation vendeur (baisse de prix, succession, divorce, mutation, urgence).` }] }],
-            generationConfig:{ temperature:0.1, maxOutputTokens:2048 }
-          })
-        }
-      );
+            contents:[{ role:"user", parts:[{ text:`Recherche sur leboncoin.fr, pap.fr, Facebook et annonces légales Aude des annonces immobilières de PARTICULIERS (sans agence) dans : ${zonesStr}, Aude (11), France. Type : ${typeStr}. Sources : ${sourceStr}. Moins de ${anciennete} jours.
 
-      if (!res1.ok) {
-        const err = await res1.json();
-        if (res1.status===429) setSearchErr("Trop de requêtes — attends 60 secondes et réessaie.");
-        else setSearchErr(`Erreur API : ${err?.error?.message || res1.status}`);
-        setSearching(false); return;
-      }
-
-      const data1 = await res1.json();
-      const rawText = (data1.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
-
-if (!rawText.trim()) {
-  setSearchErr("Aucun résultat trouvé. Essaie d'élargir les critères.");
-  setSearching(false); return;
-}
-// DEBUG TEMPORAIRE
-setSearchErr("DEBUG rawText: " + rawText.slice(0, 500));
-setSearching(false); return;
-
-
-      // Étape 2 : structurer en JSON
-      setSearchStep("⚙️ Analyse et structuration des résultats…");
-      const res2 = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-        {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({
-            contents:[{ role:"user", parts:[{ text:`Voici des résultats de recherche sur des annonces immobilières :\n\n${rawText}\n\nExtrait et structure ces annonces en tableau JSON. Retourne UNIQUEMENT le tableau JSON brut, sans markdown, sans backticks, sans texte avant ou après :\n[{"titre":"description courte du bien ex Maison 4p avec jardin","type":"Maison ou Appartement ou Terrain ou Local commercial","zone":"ville ou secteur","prix":"prix avec euro ou vide si inconnu","source":"Le Bon Coin ou PAP.fr ou Facebook ou Annonces légales","url":"lien direct vers annonce ou vide","contact":"nom ou pseudo vendeur ou vide","anciennete":"nombre de jours estimé ou vide","signal":"signal motivation vendeur ex baisse de prix succession divorce ou vide","note":"1 phrase pourquoi bonne piste pour Amandine mandataire immobilière"}]\nMaximum 10 résultats. Si aucune annonce exploitable retourner [].` }] }],
+IMPORTANT : Ne décris pas ce que tu vas faire. Effectue la recherche maintenant et retourne DIRECTEMENT et UNIQUEMENT un tableau JSON (sans markdown, sans texte avant ou après) avec les annonces trouvées :
+[{"titre":"ex: Maison T4 avec jardin","type":"Maison","zone":"Narbonne","prix":"250000€","source":"Le Bon Coin","url":"https://...","contact":"","anciennete":"5","signal":"prix baissé","note":"bonne piste car..."}]
+Si rien trouvé : []` }] }],
             generationConfig:{ temperature:0, maxOutputTokens:2048 }
           })
         }
       );
 
-      const data2 = await res2.json();
-      const text2 = (data2.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
-      const clean = text2.replace(/```json|```/g,"").trim();
-      const match = clean.match(/\[[\s\S]*\]/);
+      if (!res.ok) {
+        const err = await res.json();
+        if (res.status===429) setSearchErr("Trop de requêtes — attends 60 secondes et réessaie.");
+        else setSearchErr(`Erreur API : ${err?.error?.message || res.status}`);
+        setSearching(false); return;
+      }
+
+      const data = await res.json();
+      const text = (data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
+      const match = text.match(/\[[\s\S]*\]/);
       if (!match) {
-        setSearchErr("Pas de résultats exploitables. Réessaie dans quelques secondes.");
+        setSearchErr("Aucune annonce trouvée. Essaie d'élargir les critères ou l'ancienneté.");
         setSearching(false); return;
       }
       const parsed = JSON.parse(match[0]);
