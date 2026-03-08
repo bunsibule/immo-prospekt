@@ -19,12 +19,10 @@ function Spinner({ size=18 }) {
 export default function App() {
   const [tab, setTab] = useState("chasse");
 
-  // Clé API stockée localement
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("gemini_key") || "");
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [keyDraft, setKeyDraft] = useState("");
 
-  // Chasse
   const [zones,      setZones]      = useState(["Narbonne","Corbières – Lézignan"]);
   const [typeBien,   setTypeBien]   = useState("Tous types");
   const [anciennete, setAnciennete] = useState("30");
@@ -33,7 +31,6 @@ export default function App() {
   const [searchErr,  setSearchErr]  = useState("");
   const [lastSearch, setLastSearch] = useState(null);
 
-  // Liste
   const [shortlist,   setShortlist]   = useState([]);
   const [loadingList, setLoadingList] = useState(true);
   const [selectedPr,  setSelectedPr]  = useState(null);
@@ -65,7 +62,6 @@ export default function App() {
     showToast("Clé Gemini sauvegardée ✓");
   }
 
-  // ── CHASSE GEMINI ─────────────────────────────────────────────────────────
   async function lancerChasse() {
     if (!apiKey) { setShowKeyInput(true); return; }
     if (zones.length === 0) { showToast("Sélectionne au moins une zone","err"); return; }
@@ -121,11 +117,8 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       const clean = text.replace(/```json|```/g,"").trim();
-
-      // Extraire le JSON même s'il y a du texte autour
       const match = clean.match(/\[[\s\S]*\]/);
       if (!match) { setSearchErr("L'IA n'a pas renvoyé de résultats structurés. Réessaie."); setSearching(false); return; }
-
       const parsed = JSON.parse(match[0]);
       setResults(Array.isArray(parsed) ? parsed : []);
       if (!parsed.length) setSearchErr("Aucune annonce trouvée pour ces critères. Essaie d'élargir la zone ou l'ancienneté.");
@@ -136,7 +129,6 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
     setSearching(false);
   }
 
-  // ── SAUVEGARDER ───────────────────────────────────────────────────────────
   async function sauvegarder(r) {
     if (shortlist.find(p => p.name===r.titre && p.zone===r.zone)) { showToast("Déjà dans ta liste","info"); return; }
     const { error } = await supabase.from("prospects").insert([{
@@ -154,7 +146,6 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
     loadShortlist();
   }
 
-  // ── STATUT ────────────────────────────────────────────────────────────────
   async function updStatus(id, status) {
     await supabase.from("prospects").update({status}).eq("id",id);
     setShortlist(prev => prev.map(p => p.id===id?{...p,status}:p));
@@ -170,7 +161,6 @@ Retourne UNIQUEMENT un tableau JSON valide, sans markdown, sans explication :
     showToast("Retiré","info");
   }
 
-  // ── MESSAGE GEMINI ────────────────────────────────────────────────────────
   async function genererMessage(p) {
     if (!apiKey) { showToast("Configure ta clé Gemini d'abord","err"); return; }
     setGenLoading(true); setGenMsg("");
@@ -215,10 +205,8 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
         .rcard:hover{border-color:rgba(201,168,76,.3)!important;background:rgba(201,168,76,.04)!important;}
       `}</style>
 
-      {/* Toast */}
       {toast && <div style={{ position:"fixed",top:20,right:20,zIndex:9999,background:toast.type==="err"?"rgba(239,68,68,.95)":toast.type==="info"?"rgba(30,64,175,.95)":"rgba(16,185,129,.95)",color:"#fff",padding:"12px 22px",borderRadius:12,fontSize:13,fontWeight:600,boxShadow:"0 8px 30px rgba(0,0,0,.5)",animation:"slideIn .2s ease" }}>{toast.msg}</div>}
 
-      {/* Sidebar */}
       <div style={{ width:220,background:"rgba(255,255,255,.02)",borderRight:"1px solid rgba(255,255,255,.06)",padding:"28px 14px",display:"flex",flexDirection:"column",gap:6,flexShrink:0 }}>
         <div style={{ paddingLeft:8,marginBottom:28 }}>
           <div style={{ fontFamily:"'Playfair Display',serif",fontSize:19,color:"#c9a84c",lineHeight:1.2 }}>Immo<span style={{ color:"#f1f5f9" }}>Hunter</span></div>
@@ -241,22 +229,18 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
         </div>
       </div>
 
-      {/* Main */}
       <div style={{ flex:1,padding:"30px 36px",overflowY:"auto",maxHeight:"100vh" }}>
 
-        {/* ══ CONFIG ══════════════════════════════════════════════════════════ */}
         {tab==="config" && (
           <div style={{ animation:"fadeIn .3s ease" }}>
             <h1 style={{ fontFamily:"'Playfair Display',serif",fontSize:32,margin:"0 0 6px",fontWeight:700 }}>Configuration</h1>
             <p style={{ color:"#4b5563",margin:"0 0 28px",fontSize:14 }}>Configure ta clé Gemini pour activer la chasse automatique</p>
-
             <div style={{ background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)",borderRadius:16,padding:28,maxWidth:560 }}>
               <h3 style={{ margin:"0 0 6px",fontSize:16,color:"#c9a84c" }}>🔑 Clé API Google Gemini</h3>
               <p style={{ margin:"0 0 20px",fontSize:13,color:"#4b5563",lineHeight:1.7 }}>
                 Gratuit · 1 500 recherches/jour · Aucune carte bancaire requise<br/>
                 <strong style={{ color:"#94a3b8" }}>Obtenir la clé :</strong> <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" style={{ color:"#c9a84c" }}>aistudio.google.com</a> → Get API Key → Create API key
               </p>
-
               {apiKey ? (
                 <div>
                   <div style={{ display:"flex",alignItems:"center",gap:10,background:"rgba(16,185,129,.08)",border:"1px solid rgba(16,185,129,.2)",borderRadius:10,padding:"12px 16px",marginBottom:16 }}>
@@ -280,22 +264,19 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
                   <button onClick={saveKey} disabled={!keyDraft.trim()} style={{ ...btnG,opacity:keyDraft.trim()?1:.5 }}>Enregistrer la clé</button>
                 </div>
               )}
-
               <div style={{ marginTop:24,background:"rgba(59,130,246,.06)",border:"1px solid rgba(59,130,246,.15)",borderRadius:10,padding:16 }}>
                 <div style={{ fontSize:12,color:"#93c5fd",fontWeight:600,marginBottom:8 }}>🔒 Sécurité</div>
-                <p style={{ margin:0,fontSize:12,color:"#4b5563",lineHeight:1.7 }}>La clé est stockée <strong style={{ color:"#94a3b8" }}>uniquement sur cet appareil</strong> (localStorage). Elle n'est jamais envoyée à un serveur tiers. Si tu utilises l'app sur un autre appareil, il faudra la saisir à nouveau.</p>
+                <p style={{ margin:0,fontSize:12,color:"#4b5563",lineHeight:1.7 }}>La clé est stockée <strong style={{ color:"#94a3b8" }}>uniquement sur cet appareil</strong> (localStorage). Elle n'est jamais envoyée à un serveur tiers.</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* ══ CHASSE ══════════════════════════════════════════════════════════ */}
         {tab==="chasse" && (
           <div style={{ animation:"fadeIn .3s ease" }}>
             <h1 style={{ fontFamily:"'Playfair Display',serif",fontSize:32,margin:"0 0 6px",fontWeight:700 }}>Chasse automatique</h1>
             <p style={{ color:"#4b5563",margin:"0 0 28px",fontSize:14 }}>Gemini + Google Search fouille LBC, PAP, Facebook et annonces légales pour toi</p>
 
-            {/* Alerte clé manquante */}
             {!apiKey && (
               <div style={{ background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.25)",borderRadius:12,padding:"16px 20px",marginBottom:22,display:"flex",alignItems:"center",justifyContent:"space-between" }}>
                 <div style={{ display:"flex",alignItems:"center",gap:12 }}>
@@ -306,10 +287,7 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
               </div>
             )}
 
-            {/* Panneau */}
             <div style={{ background:"rgba(201,168,76,.05)",border:"1px solid rgba(201,168,76,.2)",borderRadius:18,padding:28,marginBottom:28 }}>
-
-              {/* Zones */}
               <div style={{ marginBottom:20 }}>
                 <label style={{ fontSize:11,color:"#6b7280",display:"block",marginBottom:10,textTransform:"uppercase",letterSpacing:"1px",fontWeight:600 }}>📍 Zones à prospecter</label>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>
@@ -320,8 +298,6 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
                   ))}
                 </div>
               </div>
-
-              {/* Filtres */}
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22 }}>
                 <div>
                   <label style={{ fontSize:11,color:"#6b7280",display:"block",marginBottom:7,textTransform:"uppercase",letterSpacing:"1px",fontWeight:600 }}>🏠 Type de bien</label>
@@ -338,7 +314,6 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
                   </select>
                 </div>
               </div>
-
               <div style={{ display:"flex",alignItems:"center",gap:16 }}>
                 <button onClick={lancerChasse} disabled={searching||!apiKey} style={{ ...btnG,padding:"13px 36px",fontSize:15,opacity:searching||!apiKey?.6:1,display:"flex",alignItems:"center",gap:10 }}>
                   {searching?<><Spinner size={16}/>Recherche…</>:"🚀 Lancer la chasse"}
@@ -347,7 +322,6 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
               </div>
             </div>
 
-            {/* Loader */}
             {searching && (
               <div style={{ textAlign:"center",padding:"50px 0" }}>
                 <div style={{ display:"flex",justifyContent:"center",marginBottom:16 }}><Spinner size={40}/></div>
@@ -357,14 +331,12 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
               </div>
             )}
 
-            {/* Erreur */}
             {searchErr&&!searching&&(
               <div style={{ background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.2)",borderRadius:12,padding:"16px 20px",color:"#f87171",fontSize:13,marginBottom:20 }}>
                 {searchErr}
               </div>
             )}
 
-            {/* Résultats */}
             {results.length>0&&!searching&&(
               <div style={{ animation:"fadeIn .4s ease" }}>
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
@@ -382,7 +354,7 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
                         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16 }}>
                           <div style={{ flex:1 }}>
                             <div style={{ display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:10 }}>
-                              <span style={{ fontSize:16 }}>{{  "Le Bon Coin":"🏷️","PAP.fr":"📰","Facebook":"📱","Annonces légales":"⚖️"}[r.source]||"🔍"}</span>
+                              <span style={{ fontSize:16 }}>{{ "Le Bon Coin":"🏷️","PAP.fr":"📰","Facebook":"📱","Annonces légales":"⚖️"}[r.source]||"🔍"}</span>
                               <span style={{ fontWeight:700,fontSize:15,color:"#f1f5f9" }}>{r.titre}</span>
                               {r.type&&<span style={{ fontSize:11,color:"#6b7280",background:"rgba(255,255,255,.06)",padding:"2px 9px",borderRadius:6 }}>{r.type}</span>}
                               {r.anciennete&&<span style={{ fontSize:11,color:"#4b5563" }}>~{r.anciennete}j</span>}
@@ -426,19 +398,14 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
           </div>
         )}
 
-        {/* ══ LISTE ═══════════════════════════════════════════════════════════ */}
         {tab==="liste" && (
           <div style={{ animation:"fadeIn .3s ease" }}>
             <h1 style={{ fontFamily:"'Playfair Display',serif",fontSize:32,margin:"0 0 6px",fontWeight:700 }}>Ma liste</h1>
             <p style={{ color:"#4b5563",margin:"0 0 24px",fontSize:14 }}>{shortlist.length} prospect(s) · {aContacter} à appeler</p>
-
             {loadingList&&<div style={{ display:"flex",gap:12,alignItems:"center",color:"#4b5563",padding:20 }}><Spinner/>Chargement…</div>}
-
             {!loadingList&&shortlist.length>0&&(
               <div style={{ display:"flex",gap:10,marginBottom:20,flexWrap:"wrap" }}>
-                {STATUSES.map(s=>{
-                  const c=shortlist.filter(p=>p.status===s).length; if(!c)return null;
-                  const col=STATUS_C[s]||"#6b7280";
+                {STATUSES.map(s=>{ const c=shortlist.filter(p=>p.status===s).length; if(!c)return null; const col=STATUS_C[s]||"#6b7280";
                   return <div key={s} style={{ background:col+"15",border:`1px solid ${col}33`,borderRadius:10,padding:"8px 16px",display:"flex",gap:8,alignItems:"center" }}>
                     <span style={{ fontSize:20,fontWeight:700,color:col }}>{c}</span>
                     <span style={{ fontSize:12,color:col }}>{s}</span>
@@ -446,7 +413,6 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
                 })}
               </div>
             )}
-
             <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
               {!loadingList&&shortlist.map(p=>(
                 <div key={p.id} style={{ background:selectedPr?.id===p.id?"rgba(201,168,76,.05)":"rgba(255,255,255,.025)",border:selectedPr?.id===p.id?"1px solid rgba(201,168,76,.25)":"1px solid rgba(255,255,255,.07)",borderRadius:13,padding:"16px 22px",transition:"all .15s" }}>
@@ -472,7 +438,7 @@ Français, moins de 80 mots, humain et naturel, pas commercial. Proposer un simp
                     <div style={{ marginTop:16,paddingTop:16,borderTop:"1px solid rgba(255,255,255,.06)" }}>
                       <div style={{ fontSize:11,color:"#4b5563",marginBottom:9,textTransform:"uppercase",letterSpacing:".5px" }}>Statut</div>
                       <div style={{ display:"flex",gap:7,flexWrap:"wrap",marginBottom:16 }}>
-                        {STATUSES.map(s=>{const c=STATUS_C[s]||"#6b7280"; return(
+                        {STATUSES.map(s=>{ const c=STATUS_C[s]||"#6b7280"; return(
                           <button key={s} onClick={()=>updStatus(p.id,s)} style={{ padding:"5px 13px",borderRadius:20,fontSize:11,cursor:"pointer",fontFamily:"inherit",fontWeight:p.status===s?700:400,background:p.status===s?c+"22":"transparent",color:c,border:`1px solid ${c}${p.status===s?"55":"22"}`,transition:"all .1s" }}>{s}</button>
                         );})}
                       </div>
